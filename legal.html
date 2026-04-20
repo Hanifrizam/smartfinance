@@ -7,6 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
+    <script src="https://res.cdn.office.net/teams-js/2.11.0/js/MicrosoftTeams.min.js"></script>
+    
     <style>
         /* =========================================================
            1. CSS VARIABLES & THEME SETUP
@@ -231,9 +233,27 @@
         
         /* Utilitas untuk muter ikon saat proses */
         .spinning { animation: spin 1s linear infinite; }
+
+        /* =========================================================
+           9. CSS AKSES DITOLAK (GATEKEEPER)
+           ========================================================= */
+        #access-denied {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-body); z-index: 100000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: var(--danger); text-align: center;
+        }
+        #access-denied h1 { font-size: 24px; margin-bottom: 10px; color: var(--text-main); }
+        #access-denied i { font-size: 60px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
+
+    <div id="access-denied">
+        <i class="ph ph-shield-warning"></i>
+        <h1>Akses Ditolak</h1>
+        <p>Sistem ini hanya bisa diakses melalui platform internal perusahaan (MS Teams).</p>
+    </div>
 
     <div class="cursor-dot"></div>
     <div class="cursor-outline"></div>
@@ -257,7 +277,7 @@
         </div>
     </div>
 
-    <div class="dashboard-container">
+    <div class="dashboard-container" id="main-dashboard" style="display: none;">
         <div class="header-top">
             <div class="header-titles">
                 <h2>Corporate Help Center</h2>
@@ -631,10 +651,32 @@
             }, 3500);
         }
 
-        // --- INIT ---
-        window.onload = () => {
-            fetchSupabaseData(); // Tarik data pertama kali
-            addCursorHover(); // Inisialisasi cursor events
+        // --- 10. INIT & GATEKEEPER ---
+        window.onload = async () => {
+            try {
+                // 1. Inisialisasi MS Teams
+                await microsoftTeams.app.initialize();
+                
+                // 2. Jika berhasil (artinya dibuka di dalam Teams), ambil konteksnya
+                const context = await microsoftTeams.app.getContext();
+                
+                // 3. Sinyal cocok! Buka gerbangnya
+                document.getElementById('access-denied').style.display = 'none';
+                document.getElementById('main-dashboard').style.display = 'block';
+                
+                // 4. Jalankan sistem dashboard
+                fetchSupabaseData(); 
+                addCursorHover();
+                
+                // Opsional: Memunculkan toast sukses dengan ID User Teams
+                // showToast("Sinyal Valid", `Akses diberikan untuk ID: ${context.user.id.substring(0,8)}`, "success", "ph-shield-check");
+
+            } catch (error) {
+                // Jika error (bukan dibuka di Teams), biarkan access-denied tetap muncul
+                console.error("Bukan di MS Teams:", error);
+                // Matikan efek loading yang berputar terus
+                document.getElementById('loader').classList.add('hide-loader');
+            }
         };
     </script>
 </body>
