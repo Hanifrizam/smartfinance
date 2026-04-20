@@ -38,7 +38,7 @@
             --success: #10b981;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; cursor: none; /* Menyembunyikan kursor asli */ }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; cursor: none; }
         
         body { 
             background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
@@ -57,15 +57,11 @@
             position: fixed; top: 0; left: 0; transform: translate(-50%, -50%);
             border-radius: 50%; z-index: 9999; pointer-events: none;
         }
-        .cursor-dot {
-            width: 8px; height: 8px; background-color: var(--primary);
-        }
+        .cursor-dot { width: 8px; height: 8px; background-color: var(--primary); }
         .cursor-outline {
             width: 40px; height: 40px; border: 2px solid var(--primary);
-            transition: width 0.2s, height 0.2s, background-color 0.2s;
-            opacity: 0.5;
+            transition: width 0.2s, height 0.2s, background-color 0.2s; opacity: 0.5;
         }
-        /* Saat kursor berada di atas tombol/link */
         .cursor-hover .cursor-outline {
             width: 60px; height: 60px; background-color: rgba(79, 70, 229, 0.1);
             border-color: transparent;
@@ -87,20 +83,16 @@
         }
         #loader h3 { color: var(--text-main); font-weight: 600; letter-spacing: 1px; }
         .hide-loader { opacity: 0; visibility: hidden; }
-
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* =========================================================
            4. MAIN DASHBOARD LAYOUT & GLASSMORPHISM
            ========================================================= */
         .dashboard-container { 
-            background: var(--bg-card); 
-            backdrop-filter: blur(20px);
-            width: 100%; max-width: 1100px; 
-            border-radius: 20px; 
-            border: 1px solid var(--glass-border);
-            box-shadow: var(--shadow-soft); 
-            padding: 40px;
+            background: var(--bg-card); backdrop-filter: blur(20px);
+            width: 100%; max-width: 1200px; /* Diperlebar sedikit untuk kolom baru */
+            border-radius: 20px; border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-soft); padding: 40px;
             animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -108,19 +100,29 @@
         .header-titles h2 { font-size: 14px; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
         .header-titles h1 { font-size: 32px; color: var(--text-main); font-weight: 800; letter-spacing: -0.5px; }
         
-        .header-actions { display: flex; align-items: center; gap: 15px; }
+        .header-actions { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: flex-end; }
         .request-count { 
             background: var(--progress-bg); color: var(--primary); 
             padding: 8px 16px; border-radius: 30px; font-weight: 700; font-size: 14px; 
             display: flex; align-items: center; gap: 8px; box-shadow: inset 0 2px 4px rgba(255,255,255,0.5);
         }
+        
+        /* Tombol Standar */
         .btn-connect { 
             background: linear-gradient(135deg, var(--primary), var(--secondary)); 
             color: white; border: none; padding: 10px 20px; border-radius: 12px; 
             font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; 
             transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
         }
-        .interactive-element:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4); }
+        /* Tombol Export Baru */
+        .btn-export {
+            background: linear-gradient(135deg, #10b981, #059669); 
+            color: white; border: none; padding: 10px 20px; border-radius: 12px; 
+            font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; 
+            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        .interactive-element:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
 
         /* =========================================================
            5. FILTER & SEARCH BAR
@@ -136,10 +138,7 @@
         .search-box input { border: none; background: transparent; outline: none; width: 100%; margin-left: 10px; font-size: 14px; color: var(--text-main); }
         
         .filter-options { display: flex; gap: 10px; }
-        .filter-btn {
-            background: transparent; border: 1px solid var(--border); color: var(--text-muted);
-            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: 0.3s;
-        }
+        .filter-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: 0.3s; }
         .filter-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
 
         /* =========================================================
@@ -149,14 +148,13 @@
         table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
         th { text-align: left; padding: 0 20px 10px; color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--border); }
         
-        /* Row Animasi Kaskade */
         tr.data-row { 
             background: white; transition: all 0.3s ease; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
             opacity: 0; transform: translateY(20px); animation: rowEntrance 0.5s ease forwards;
         }
         tr.data-row:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-        td { padding: 20px; font-size: 14px; vertical-align: middle; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        td { padding: 16px 20px; font-size: 14px; vertical-align: middle; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
         td:first-child { border-left: 1px solid var(--border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
         td:last-child { border-right: 1px solid var(--border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
 
@@ -177,6 +175,9 @@
         .btn-action.delete:hover { background: var(--danger-bg); color: var(--danger); }
 
         .response-time { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-body); padding: 6px 12px; border-radius: 20px; font-size: 13px; color: var(--text-muted); font-weight: 500; border: 1px solid var(--border); }
+        
+        /* Highlight warna untuk kolom Terakhir Merespon */
+        .last-active { color: var(--primary); font-weight: 600; font-size: 13px; }
 
         /* =========================================================
            7. CUSTOM MODAL (DELETE CONFIRMATION)
@@ -231,7 +232,6 @@
         @keyframes fadeOutRight { to { transform: translateX(100%); opacity: 0; } }
         @keyframes progress { to { width: 0%; } }
         
-        /* Utilitas untuk muter ikon saat proses */
         .spinning { animation: spin 1s linear infinite; }
 
         /* =========================================================
@@ -243,17 +243,13 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             color: var(--danger); text-align: center;
         }
-        #access-denied h1 { font-size: 24px; margin-bottom: 10px; color: var(--text-main); }
-        #access-denied i { font-size: 60px; margin-bottom: 20px; }
+        #access-denied h1 { font-size: 26px; font-weight: 800; margin-bottom: 10px; color: var(--text-main); }
+        #access-denied p { color: var(--text-muted); font-size: 15px; margin-bottom: 25px; }
     </style>
 </head>
 <body>
 
-    <div id="access-denied">
-        <i class="ph ph-shield-warning"></i>
-        <h1>Akses Ditolak</h1>
-        <p>Sistem ini hanya bisa diakses melalui platform internal perusahaan (MS Teams).</p>
-    </div>
+    <div id="access-denied"></div>
 
     <div class="cursor-dot"></div>
     <div class="cursor-outline"></div>
@@ -284,8 +280,12 @@
                 <h1>Legal Requests Dashboard</h1>
             </div>
             <div class="header-actions">
+                <button class="interactive-element btn-export" onclick="exportToExcel()">
+                    <i class="ph ph-microsoft-excel-logo"></i> Export Data
+                </button>
+                
                 <button class="interactive-element btn-connect" onclick="fetchSupabaseData(true)">
-                    <i class="ph ph-arrows-clockwise" id="refreshIcon"></i> Refresh Data
+                    <i class="ph ph-arrows-clockwise" id="refreshIcon"></i> Refresh
                 </button>
                 <div class="request-count" title="Total tiket tersisa">
                     <span id="total-requests">0</span> Open
@@ -314,6 +314,7 @@
                         <th>Requester</th>
                         <th>Action</th>
                         <th>Response Time</th>
+                        <th>Terakhir Merespon</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
@@ -330,14 +331,12 @@
         window.addEventListener('mousemove', (e) => {
             cursorDot.style.left = `${e.clientX}px`;
             cursorDot.style.top = `${e.clientY}px`;
-            // Smooth delay untuk outline
             setTimeout(() => {
                 cursorOutline.style.left = `${e.clientX}px`;
                 cursorOutline.style.top = `${e.clientY}px`;
             }, 50);
         });
 
-        // Deteksi elemen interaktif untuk membesarkan kursor
         const addCursorHover = () => {
             document.querySelectorAll('.interactive-element').forEach(el => {
                 el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
@@ -349,21 +348,16 @@
         const SUPABASE_URL = "https://kghrtucyqarhxkczriio.supabase.co/rest/v1/legal_requests";
         const SUPABASE_KEY = "sb_publishable_LzxS6jaMXBt0RqWpjjs1Gw_DVRK-NLf";
 
-        // Global State Management
         let allRequests = []; 
         let currentFilter = 'ALL';
         let currentSearch = '';
-        let rowToDeleteId = null; // Menyimpan ID baris yang akan dihapus
+        let rowToDeleteId = null; 
 
         const tableBody = document.getElementById('table-body');
         const searchInput = document.getElementById('searchInput');
         const filterBtns = document.querySelectorAll('.filter-btn');
 
-        // --- 3. FUNGSI WAKTU (KALKULASI DETAIL) ---
-        /**
-         * Mengkalkulasi selisih waktu antara waktu pembuatan (created_at)
-         * dengan waktu saat ini.
-         */
+        // --- 3A. FUNGSI KALKULASI WAKTU RESPONSE ---
         function calculateDetailedTime(createdAtString) {
             const createdTime = new Date(createdAtString).getTime();
             const now = new Date().getTime();
@@ -381,6 +375,23 @@
             }
             const remHours = diffHours % 24;
             return remHours > 0 ? `${diffDays} Hari ${remHours} Jam` : `${diffDays} Hari`;
+        }
+
+        // --- 3B. FUNGSI WAKTU TERAKHIR MERESPON (FITUR BARU) ---
+        function timeAgo(dateString) {
+            if (!dateString) return "-";
+            const now = new Date();
+            const past = new Date(dateString);
+            const diffMs = now - past;
+            
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffMins < 1) return "Baru saja";
+            if (diffMins < 60) return `${diffMins} menit yg lalu`;
+            if (diffHours < 24) return `${diffHours} jam yg lalu`;
+            return `${diffDays} hari yg lalu`;
         }
 
         // --- 4. CRUD: BACA DATA (READ) ---
@@ -404,23 +415,19 @@
                 console.error(error);
                 showToast("Koneksi Gagal", "Gagal terhubung ke database.", "error", "ph-warning-octagon");
             } finally {
-                // Sembunyikan Fullscreen Loader setelah proses pertama kali selesai
                 document.getElementById('loader').classList.add('hide-loader');
                 document.getElementById('refreshIcon').classList.remove('spinning');
             }
         }
 
         // --- 5. FILTERING & SEARCHING ---
-        // Event Listener untuk Input Pencarian
         searchInput.addEventListener('input', (e) => {
             currentSearch = e.target.value.toLowerCase();
             applyFiltersAndRender();
         });
 
-        // Event Listener untuk Tombol Filter Status
         filterBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                // Ubah styling tombol aktif
                 filterBtns.forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 
@@ -429,13 +436,10 @@
             });
         });
 
-        // Terapkan Filter lalu Render
         function applyFiltersAndRender() {
             let filtered = allRequests.filter(req => {
-                // Filter Teks
                 const matchSearch = req.summary.toLowerCase().includes(currentSearch) || 
                                     req.requester_name.toLowerCase().includes(currentSearch);
-                // Filter Status
                 const matchStatus = currentFilter === 'ALL' || req.status === currentFilter;
                 
                 return matchSearch && matchStatus;
@@ -450,7 +454,7 @@
             tableBody.innerHTML = '';
             
             if(dataArray.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 50px; color: var(--text-muted);">
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 50px; color: var(--text-muted);">
                     <i class="ph ph-folder-open" style="font-size: 40px; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
                     Tidak ada tiket legal yang ditemukan.
                 </td></tr>`;
@@ -463,9 +467,11 @@
                 const statusIcon = isTodo ? "ph-hourglass-high" : "ph-check-circle";
                 const initials = req.requester_name.substring(0, 2).toUpperCase();
                 
+                // Menghitung status kapan terakhir direspon
+                const lastActiveText = req.responded_at ? timeAgo(req.responded_at) : "Belum direspons";
+                
                 const tr = document.createElement('tr');
                 tr.className = "data-row";
-                // Menambahkan delay animasi berdasarkan urutan baris (staggered effect)
                 tr.style.animationDelay = `${index * 0.05}s`;
                 
                 tr.innerHTML = `
@@ -505,11 +511,15 @@
                             ${req.response_time} 
                         </div>
                     </td>
+                    <td>
+                        <div class="last-active" id="last-responded-${req.id}">
+                            <i class="ph ph-clock-counter-clockwise"></i> ${lastActiveText}
+                        </div>
+                    </td>
                 `;
                 tableBody.appendChild(tr);
             });
             
-            // Re-apply hover detector for the new buttons
             addCursorHover();
         }
 
@@ -519,16 +529,15 @@
             
             const requestIndex = allRequests.findIndex(r => r.id === id);
             
-            // Jika status masih TO DO, kita update ke IN PROGRESS dan hitung waktu responsnya
             if (requestIndex !== -1 && allRequests[requestIndex].status === "TO DO") {
-                
-                // 1. Kalkulasi Waktu Respons (Fitur Baru)
                 const detailedTimeDelta = calculateDetailedTime(createdAtStr);
                 const finalResponseText = `Waktu respons: ${detailedTimeDelta}`;
+                const nowISO = new Date().toISOString();
 
-                // 2. Update UI secara instan (Optimistic UI)
+                // Optimistic UI Update
                 const statusBadge = document.getElementById(`status-${id}`);
                 const timeDiv = document.getElementById(`time-${id}`);
+                const lastRespondedDiv = document.getElementById(`last-responded-${id}`);
                 
                 if (statusBadge) {
                     statusBadge.className = "badge progress";
@@ -539,12 +548,16 @@
                     timeDiv.style.borderColor = "var(--primary)";
                     timeDiv.style.backgroundColor = "var(--progress-bg)";
                 }
+                if (lastRespondedDiv) {
+                    lastRespondedDiv.innerHTML = `<i class="ph ph-clock-counter-clockwise"></i> Baru saja`;
+                }
 
-                // 3. Update State Lokal
+                // Update Array Lokal
                 allRequests[requestIndex].status = "IN PROGRESS";
                 allRequests[requestIndex].response_time = finalResponseText;
+                allRequests[requestIndex].responded_at = nowISO;
 
-                // 4. Update Database Supabase (PATCH)
+                // Update Database Supabase
                 try {
                     await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
                         method: 'PATCH',
@@ -555,7 +568,8 @@
                         },
                         body: JSON.stringify({ 
                             status: 'IN PROGRESS', 
-                            response_time: finalResponseText 
+                            response_time: finalResponseText,
+                            responded_at: nowISO // Inject waktu respond ke DB
                         })
                     });
                 } catch (err) {
@@ -564,7 +578,6 @@
                 }
             }
 
-            // Eksekusi MS Teams Deep Link
             setTimeout(() => {
                 window.location.href = `msteams://teams.microsoft.com/l/chat/0/0?users=${email}`;
             }, 800);
@@ -581,7 +594,6 @@
             document.getElementById('deleteModal').classList.remove('active');
         }
 
-        // Eksekusi saat tombol 'Ya, Hapus' di klik
         document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
             if (!rowToDeleteId) return;
             
@@ -591,7 +603,6 @@
             btn.disabled = true;
 
             try {
-                // Eksekusi DELETE ke API Supabase
                 const response = await fetch(`${SUPABASE_URL}?id=eq.${rowToDeleteId}`, {
                     method: 'DELETE',
                     headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -599,7 +610,6 @@
 
                 if (!response.ok) throw new Error("Gagal menghapus");
 
-                // Update lokal state
                 allRequests = allRequests.filter(req => req.id !== rowToDeleteId);
                 applyFiltersAndRender();
                 
@@ -614,18 +624,65 @@
             }
         });
 
-        // Tutup modal jika area luar diklik
         document.getElementById('deleteModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
         });
 
-        // --- 9. ADVANCED TOAST NOTIFICATION ---
-        /**
-         * @param {string} title - Judul alert
-         * @param {string} message - Pesan detail
-         * @param {string} type - 'success', 'info', atau 'error'
-         * @param {string} icon - Phosphor icon class (e.g., 'ph-check-circle')
-         */
+        // --- 9. FITUR BARU: EXPORT TO EXCEL (CSV) ---
+        function exportToExcel() {
+            if (allRequests.length === 0) {
+                showToast("Export Gagal", "Tidak ada data untuk diunduh.", "error", "ph-warning");
+                return;
+            }
+
+            // Ambil data yang sedang tampil di layar (sudah difilter)
+            let dataToExport = allRequests;
+            if (currentFilter !== 'ALL' || currentSearch !== '') {
+                dataToExport = allRequests.filter(req => {
+                    const matchSearch = req.summary.toLowerCase().includes(currentSearch) || 
+                                        req.requester_name.toLowerCase().includes(currentSearch);
+                    const matchStatus = currentFilter === 'ALL' || req.status === currentFilter;
+                    return matchSearch && matchStatus;
+                });
+            }
+
+            // Buat header CSV
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "ID,Subject / Summary,Nama Requester,Email Requester,Status,Waktu Eksekusi Respons,Waktu Email Masuk,Kapan Terakhir Direspons\n";
+
+            // Looping isi data
+            dataToExport.forEach(req => {
+                const id = req.id;
+                const subject = `"${req.summary.replace(/"/g, '""')}"`; // Mencegah error jika ada tanda kutip di subject
+                const name = `"${req.requester_name}"`;
+                const email = `"${req.requester_email}"`;
+                const status = req.status;
+                const respTime = `"${req.response_time}"`;
+                
+                // Format tanggal biar enak dibaca di Excel
+                const createdAt = new Date(req.created_at).toLocaleString('id-ID');
+                const respondedAtDate = req.responded_at ? new Date(req.responded_at).toLocaleString('id-ID') : "Belum dieksekusi";
+                
+                // Gabungkan jadi satu baris
+                const row = [id, subject, name, email, status, respTime, `"${createdAt}"`, `"${respondedAtDate}"`].join(",");
+                csvContent += row + "\n";
+            });
+
+            // Eksekusi Download File
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            const dateStr = new Date().toISOString().slice(0, 10); // Format YYYY-MM-DD
+            
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Data_Legal_Requests_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast("Export Berhasil", "Data berhasil diunduh dalam format Excel (CSV).", "success", "ph-microsoft-excel-logo");
+        }
+
+        // --- 10. ADVANCED TOAST NOTIFICATION ---
         function showToast(title, message, type = "info", icon = "ph-info") {
             const toastContainer = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -642,7 +699,6 @@
             
             toastContainer.appendChild(toast);
             
-            // Hapus otomatis setelah animasi progress bar selesai (3.5 detik)
             setTimeout(() => {
                 toast.classList.add('fade-out');
                 toast.addEventListener('animationend', (e) => {
@@ -651,31 +707,33 @@
             }, 3500);
         }
 
-        // --- 10. INIT & GATEKEEPER ---
+        // --- 11. AUTH GATEKEEPER & INIT ---
         window.onload = async () => {
-            try {
-                // 1. Inisialisasi MS Teams
-                await microsoftTeams.app.initialize();
-                
-                // 2. Jika berhasil (artinya dibuka di dalam Teams), ambil konteksnya
-                const context = await microsoftTeams.app.getContext();
-                
-                // 3. Sinyal cocok! Buka gerbangnya
-                document.getElementById('access-denied').style.display = 'none';
-                document.getElementById('main-dashboard').style.display = 'block';
-                
-                // 4. Jalankan sistem dashboard
-                fetchSupabaseData(); 
-                addCursorHover();
-                
-                // Opsional: Memunculkan toast sukses dengan ID User Teams
-                // showToast("Sinyal Valid", `Akses diberikan untuk ID: ${context.user.id.substring(0,8)}`, "success", "ph-shield-check");
+            const authToken = sessionStorage.getItem('legal_auth_token');
+            const SECRET_CODE = "PVMI-LEGAL-DASHBOARD-AUTH-2026-X9Y8Z7";
 
-            } catch (error) {
-                // Jika error (bukan dibuka di Teams), biarkan access-denied tetap muncul
-                console.error("Bukan di MS Teams:", error);
-                // Matikan efek loading yang berputar terus
+            if (authToken !== SECRET_CODE) {
+                document.getElementById('access-denied').style.display = 'flex';
+                document.getElementById('access-denied').innerHTML = `
+                    <i class="ph ph-lock-key" style="font-size: 80px; margin-bottom: 20px;"></i>
+                    <h1>Akses Terkunci</h1>
+                    <p>Anda wajib memasukkan Kode Referral yang valid melalui halaman utama.</p>
+                    <button class="interactive-element" onclick="window.location.href='index.html'" style="margin-top:20px; padding:14px 28px; background:var(--primary); color:white; border:none; border-radius:12px; font-weight:bold; cursor:pointer; font-size:15px; transition:0.3s; box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);">Masuk ke Halaman Login</button>
+                `;
                 document.getElementById('loader').classList.add('hide-loader');
+                return;
+            }
+
+            document.getElementById('access-denied').style.display = 'none';
+            document.getElementById('main-dashboard').style.display = 'block';
+            fetchSupabaseData(); 
+            addCursorHover();
+
+            try {
+                await microsoftTeams.app.initialize();
+                const context = await microsoftTeams.app.getContext();
+            } catch (error) {
+                console.warn("Sistem berjalan secara independen di luar MS Teams.");
             }
         };
     </script>
