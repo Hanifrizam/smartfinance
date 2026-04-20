@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Legal - Premium Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        /* =========================================================
+           1. CSS VARIABLES & THEME SETUP
+           ========================================================= */
+        :root {
+            /* Warna Utama (Modern Blue & Purple gradient tone) */
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --secondary: #0ea5e9;
+            
+            /* Warna Latar & Permukaan (Glass/Clean look) */
+            --bg-body: #f8fafc;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --shadow-soft: 0 10px 40px -10px rgba(0,0,0,0.08);
+            
+            /* Warna Teks */
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            
+            /* Warna Status */
+            --todo-bg: #f1f5f9; --todo-text: #475569;
+            --progress-bg: #e0e7ff; --progress-text: #4F46E5;
+            --danger: #ef4444; --danger-hover: #dc2626;
+            --danger-bg: #fee2e2;
+            --success: #10b981;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; cursor: none; /* Menyembunyikan kursor asli */ }
+        
+        body { 
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+            color: var(--text-main); 
+            min-height: 100vh;
+            padding: 40px 20px; 
+            display: flex; 
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        /* =========================================================
+           2. CUSTOM CURSOR
+           ========================================================= */
+        .cursor-dot, .cursor-outline {
+            position: fixed; top: 0; left: 0; transform: translate(-50%, -50%);
+            border-radius: 50%; z-index: 9999; pointer-events: none;
+        }
+        .cursor-dot {
+            width: 8px; height: 8px; background-color: var(--primary);
+        }
+        .cursor-outline {
+            width: 40px; height: 40px; border: 2px solid var(--primary);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+            opacity: 0.5;
+        }
+        /* Saat kursor berada di atas tombol/link */
+        .cursor-hover .cursor-outline {
+            width: 60px; height: 60px; background-color: rgba(79, 70, 229, 0.1);
+            border-color: transparent;
+        }
+
+        /* =========================================================
+           3. LOADING OVERLAY
+           ========================================================= */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9000; transition: opacity 0.5s ease, visibility 0.5s;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 4px solid var(--todo-bg);
+            border-top: 4px solid var(--primary); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        #loader h3 { color: var(--text-main); font-weight: 600; letter-spacing: 1px; }
+        .hide-loader { opacity: 0; visibility: hidden; }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* =========================================================
+           4. MAIN DASHBOARD LAYOUT & GLASSMORPHISM
+           ========================================================= */
+        .dashboard-container { 
+            background: var(--bg-card); 
+            backdrop-filter: blur(20px);
+            width: 100%; max-width: 1100px; 
+            border-radius: 20px; 
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-soft); 
+            padding: 40px;
+            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .header-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; }
+        .header-titles h2 { font-size: 14px; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        .header-titles h1 { font-size: 32px; color: var(--text-main); font-weight: 800; letter-spacing: -0.5px; }
+        
+        .header-actions { display: flex; align-items: center; gap: 15px; }
+        .request-count { 
+            background: var(--progress-bg); color: var(--primary); 
+            padding: 8px 16px; border-radius: 30px; font-weight: 700; font-size: 14px; 
+            display: flex; align-items: center; gap: 8px; box-shadow: inset 0 2px 4px rgba(255,255,255,0.5);
+        }
+        .btn-connect { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+            color: white; border: none; padding: 10px 20px; border-radius: 12px; 
+            font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; 
+            transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+        }
+        .interactive-element:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4); }
+
+        /* =========================================================
+           5. FILTER & SEARCH BAR
+           ========================================================= */
+        .tools-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: white; padding: 12px 20px; border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+        .search-box { display: flex; align-items: center; flex: 1; max-width: 400px; background: var(--todo-bg); padding: 10px 15px; border-radius: 10px; transition: 0.3s; }
+        .search-box:focus-within { background: white; box-shadow: 0 0 0 2px var(--primary); }
+        .search-box input { border: none; background: transparent; outline: none; width: 100%; margin-left: 10px; font-size: 14px; color: var(--text-main); }
+        
+        .filter-options { display: flex; gap: 10px; }
+        .filter-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; transition: 0.3s;
+        }
+        .filter-btn.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+
+        /* =========================================================
+           6. TABLE DESIGN
+           ========================================================= */
+        .table-container { overflow-x: auto; border-radius: 12px; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+        th { text-align: left; padding: 0 20px 10px; color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid var(--border); }
+        
+        /* Row Animasi Kaskade */
+        tr.data-row { 
+            background: white; transition: all 0.3s ease; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            opacity: 0; transform: translateY(20px); animation: rowEntrance 0.5s ease forwards;
+        }
+        tr.data-row:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        td { padding: 20px; font-size: 14px; vertical-align: middle; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        td:first-child { border-left: 1px solid var(--border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        td:last-child { border-right: 1px solid var(--border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+
+        .col-summary { display: flex; align-items: center; gap: 15px; font-weight: 600; color: var(--text-main); }
+        .icon-box { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; background: linear-gradient(135deg, var(--secondary), var(--primary)); box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3); }
+        
+        .badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 6px; }
+        .badge i { font-size: 14px; }
+        .badge.todo { background: var(--todo-bg); color: var(--todo-text); }
+        .badge.progress { background: var(--progress-bg); color: var(--progress-text); }
+
+        .col-requester { display: flex; align-items: center; gap: 12px; font-weight: 500; }
+        .requester-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--text-main); display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 12px; }
+        
+        .action-group { display: flex; gap: 10px; align-items: center; }
+        .btn-action { width: 36px; height: 36px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: 0.3s; background: var(--todo-bg); color: var(--text-muted); }
+        .btn-action.teams:hover { background: #e0e7ff; color: #4F46E5; }
+        .btn-action.delete:hover { background: var(--danger-bg); color: var(--danger); }
+
+        .response-time { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-body); padding: 6px 12px; border-radius: 20px; font-size: 13px; color: var(--text-muted); font-weight: 500; border: 1px solid var(--border); }
+
+        /* =========================================================
+           7. CUSTOM MODAL (DELETE CONFIRMATION)
+           ========================================================= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10000; opacity: 0; visibility: hidden; transition: 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-box {
+            background: white; width: 100%; max-width: 400px; padding: 30px;
+            border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center; transform: scale(0.9); transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        .modal-icon { width: 60px; height: 60px; background: var(--danger-bg); color: var(--danger); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 20px; }
+        .modal-box h3 { font-size: 20px; color: var(--text-main); margin-bottom: 10px; }
+        .modal-box p { font-size: 14px; color: var(--text-muted); line-height: 1.5; margin-bottom: 25px; }
+        .modal-actions { display: flex; gap: 15px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 12px; font-weight: 700; border: none; font-size: 14px; transition: 0.2s; }
+        .btn-cancel { background: var(--todo-bg); color: var(--text-muted); }
+        .btn-cancel:hover { background: #e2e8f0; color: var(--text-main); }
+        .btn-confirm { background: var(--danger); color: white; display: flex; justify-content: center; align-items: center; gap: 8px;}
+        .btn-confirm:hover { background: var(--danger-hover); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+
+        /* =========================================================
+           8. ANIMATIONS & TOASTS
+           ========================================================= */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 15px; }
+        .toast {
+            background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 16px 20px; display: flex; align-items: center; gap: 15px;
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative; overflow: hidden; width: 320px;
+        }
+        .toast-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .toast.success .toast-icon { background: #d1fae5; color: var(--success); }
+        .toast.info .toast-icon { background: var(--progress-bg); color: var(--primary); }
+        .toast.error .toast-icon { background: var(--danger-bg); color: var(--danger); }
+        .toast-content h4 { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+        .toast-content p { font-size: 12px; color: var(--text-muted); }
+        .toast-progress { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--primary); width: 100%; animation: progress 3.5s linear forwards; }
+        .toast.success .toast-progress { background: var(--success); }
+        .toast.error .toast-progress { background: var(--danger); }
+        .toast.fade-out { animation: fadeOutRight 0.4s ease forwards; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes rowEntrance { to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOutRight { to { transform: translateX(100%); opacity: 0; } }
+        @keyframes progress { to { width: 0%; } }
+        
+        /* Utilitas untuk muter ikon saat proses */
+        .spinning { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body>
+
+    <div class="cursor-dot"></div>
+    <div class="cursor-outline"></div>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <h3>Sinkronisasi Legal System...</h3>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal-box">
+            <div class="modal-icon"><i class="ph ph-trash"></i></div>
+            <h3>Hapus Request Ini?</h3>
+            <p>Data yang dihapus dari database Supabase tidak dapat dikembalikan lagi. Yakin ingin melanjutkan?</p>
+            <div class="modal-actions">
+                <button class="interactive-element modal-btn btn-cancel" onclick="closeModal()">Batal</button>
+                <button class="interactive-element modal-btn btn-confirm" id="confirmDeleteBtn">Ya, Hapus Data</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="header-top">
+            <div class="header-titles">
+                <h2>Corporate Help Center</h2>
+                <h1>Legal Requests Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="interactive-element btn-connect" onclick="fetchSupabaseData(true)">
+                    <i class="ph ph-arrows-clockwise" id="refreshIcon"></i> Refresh Data
+                </button>
+                <div class="request-count" title="Total tiket tersisa">
+                    <span id="total-requests">0</span> Open
+                </div>
+            </div>
+        </div>
+
+        <div class="tools-bar">
+            <div class="search-box interactive-element">
+                <i class="ph ph-magnifying-glass" style="color: var(--text-muted); font-size: 18px;"></i>
+                <input type="text" id="searchInput" placeholder="Cari subjek atau nama pengirim...">
+            </div>
+            <div class="filter-options">
+                <button class="interactive-element filter-btn active" data-filter="ALL">Semua</button>
+                <button class="interactive-element filter-btn" data-filter="TO DO">To Do</button>
+                <button class="interactive-element filter-btn" data-filter="IN PROGRESS">In Progress</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Subject (Summary)</th>
+                        <th>Status</th>
+                        <th>Requester</th>
+                        <th>Action</th>
+                        <th>Response Time</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SETUP CUSTOM CURSOR ---
+        const cursorDot = document.querySelector('.cursor-dot');
+        const cursorOutline = document.querySelector('.cursor-outline');
+        
+        window.addEventListener('mousemove', (e) => {
+            cursorDot.style.left = `${e.clientX}px`;
+            cursorDot.style.top = `${e.clientY}px`;
+            // Smooth delay untuk outline
+            setTimeout(() => {
+                cursorOutline.style.left = `${e.clientX}px`;
+                cursorOutline.style.top = `${e.clientY}px`;
+            }, 50);
+        });
+
+        // Deteksi elemen interaktif untuk membesarkan kursor
+        const addCursorHover = () => {
+            document.querySelectorAll('.interactive-element').forEach(el => {
+                el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
+                el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
+            });
+        };
+
+        // --- 2. KONFIGURASI SUPABASE ---
+        const SUPABASE_URL = "https://kghrtucyqarhxkczriio.supabase.co/rest/v1/legal_requests";
+        const SUPABASE_KEY = "sb_publishable_LzxS6jaMXBt0RqWpjjs1Gw_DVRK-NLf";
+
+        // Global State Management
+        let allRequests = []; 
+        let currentFilter = 'ALL';
+        let currentSearch = '';
+        let rowToDeleteId = null; // Menyimpan ID baris yang akan dihapus
+
+        const tableBody = document.getElementById('table-body');
+        const searchInput = document.getElementById('searchInput');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+
+        // --- 3. FUNGSI WAKTU (KALKULASI DETAIL) ---
+        /**
+         * Mengkalkulasi selisih waktu antara waktu pembuatan (created_at)
+         * dengan waktu saat ini.
+         */
+        function calculateDetailedTime(createdAtString) {
+            const createdTime = new Date(createdAtString).getTime();
+            const now = new Date().getTime();
+            const diffMs = now - createdTime;
+
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffMins < 1) return "Kurang dari 1 Menit";
+            if (diffMins < 60) return `${diffMins} Menit`;
+            if (diffHours < 24) {
+                const remMins = diffMins % 60;
+                return remMins > 0 ? `${diffHours} Jam ${remMins} Menit` : `${diffHours} Jam`;
+            }
+            const remHours = diffHours % 24;
+            return remHours > 0 ? `${diffDays} Hari ${remHours} Jam` : `${diffDays} Hari`;
+        }
+
+        // --- 4. CRUD: BACA DATA (READ) ---
+        async function fetchSupabaseData(isManualRefresh = false) {
+            if (isManualRefresh) {
+                document.getElementById('refreshIcon').classList.add('spinning');
+            }
+
+            try {
+                const response = await fetch(`${SUPABASE_URL}?select=*&order=created_at.desc`, {
+                    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                });
+
+                if (!response.ok) throw new Error("Gagal mengambil data");
+
+                allRequests = await response.json();
+                applyFiltersAndRender();
+                
+                if (isManualRefresh) showToast("Sync Sukses", "Data terbaru berhasil ditarik.", "success", "ph-check-circle");
+            } catch (error) {
+                console.error(error);
+                showToast("Koneksi Gagal", "Gagal terhubung ke database.", "error", "ph-warning-octagon");
+            } finally {
+                // Sembunyikan Fullscreen Loader setelah proses pertama kali selesai
+                document.getElementById('loader').classList.add('hide-loader');
+                document.getElementById('refreshIcon').classList.remove('spinning');
+            }
+        }
+
+        // --- 5. FILTERING & SEARCHING ---
+        // Event Listener untuk Input Pencarian
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase();
+            applyFiltersAndRender();
+        });
+
+        // Event Listener untuk Tombol Filter Status
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // Ubah styling tombol aktif
+                filterBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                currentFilter = e.target.getAttribute('data-filter');
+                applyFiltersAndRender();
+            });
+        });
+
+        // Terapkan Filter lalu Render
+        function applyFiltersAndRender() {
+            let filtered = allRequests.filter(req => {
+                // Filter Teks
+                const matchSearch = req.summary.toLowerCase().includes(currentSearch) || 
+                                    req.requester_name.toLowerCase().includes(currentSearch);
+                // Filter Status
+                const matchStatus = currentFilter === 'ALL' || req.status === currentFilter;
+                
+                return matchSearch && matchStatus;
+            });
+
+            document.getElementById('total-requests').innerText = filtered.length;
+            renderTable(filtered);
+        }
+
+        // --- 6. RENDER ENGINE (UI) ---
+        function renderTable(dataArray) {
+            tableBody.innerHTML = '';
+            
+            if(dataArray.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 50px; color: var(--text-muted);">
+                    <i class="ph ph-folder-open" style="font-size: 40px; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
+                    Tidak ada tiket legal yang ditemukan.
+                </td></tr>`;
+                return;
+            }
+
+            dataArray.forEach((req, index) => {
+                const isTodo = req.status === "TO DO";
+                const statusClass = isTodo ? "todo" : "progress";
+                const statusIcon = isTodo ? "ph-hourglass-high" : "ph-check-circle";
+                const initials = req.requester_name.substring(0, 2).toUpperCase();
+                
+                const tr = document.createElement('tr');
+                tr.className = "data-row";
+                // Menambahkan delay animasi berdasarkan urutan baris (staggered effect)
+                tr.style.animationDelay = `${index * 0.05}s`;
+                
+                tr.innerHTML = `
+                    <td>
+                        <div class="col-summary">
+                            <div class="icon-box"><i class="ph ph-file-text"></i></div>
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-main); margin-bottom: 2px;">${req.summary}</div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 500;">
+                                    ID: ${req.id.substring(0,8)}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge ${statusClass}" id="status-${req.id}"><i class="ph ${statusIcon}"></i> ${req.status}</span></td>
+                    <td>
+                        <div class="col-requester">
+                            <div class="requester-avatar">${initials}</div>
+                            <div>
+                                <div style="color: var(--text-main);">${req.requester_name}</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${req.requester_email || 'No email'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-group">
+                            <button class="interactive-element btn-action teams" onclick="handleChatClick('${req.id}', '${req.requester_name}', '${req.requester_email}', '${req.created_at}')" title="Chat & Proses via Teams">
+                                <i class="ph ph-microsoft-teams-logo"></i>
+                            </button>
+                            <button class="interactive-element btn-action delete" onclick="openDeleteModal('${req.id}')" title="Hapus Permanen">
+                                <i class="ph ph-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="response-time" id="time-${req.id}">
+                            ${req.response_time} 
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            // Re-apply hover detector for the new buttons
+            addCursorHover();
+        }
+
+        // --- 7. UPDATE (PATCH) & PERHITUNGAN WAKTU DETAIL ---
+        async function handleChatClick(id, name, email, createdAtStr) {
+            showToast("Menghubungi Tim", `Membuka Teams untuk ${name}...`, "info", "ph-microsoft-teams-logo");
+            
+            const requestIndex = allRequests.findIndex(r => r.id === id);
+            
+            // Jika status masih TO DO, kita update ke IN PROGRESS dan hitung waktu responsnya
+            if (requestIndex !== -1 && allRequests[requestIndex].status === "TO DO") {
+                
+                // 1. Kalkulasi Waktu Respons (Fitur Baru)
+                const detailedTimeDelta = calculateDetailedTime(createdAtStr);
+                const finalResponseText = `Waktu respons: ${detailedTimeDelta}`;
+
+                // 2. Update UI secara instan (Optimistic UI)
+                const statusBadge = document.getElementById(`status-${id}`);
+                const timeDiv = document.getElementById(`time-${id}`);
+                
+                if (statusBadge) {
+                    statusBadge.className = "badge progress";
+                    statusBadge.innerHTML = `<i class="ph ph-check-circle"></i> IN PROGRESS`;
+                }
+                if (timeDiv) {
+                    timeDiv.innerHTML = `${finalResponseText} <i class="ph ph-clock" style="color: var(--primary)"></i>`;
+                    timeDiv.style.borderColor = "var(--primary)";
+                    timeDiv.style.backgroundColor = "var(--progress-bg)";
+                }
+
+                // 3. Update State Lokal
+                allRequests[requestIndex].status = "IN PROGRESS";
+                allRequests[requestIndex].response_time = finalResponseText;
+
+                // 4. Update Database Supabase (PATCH)
+                try {
+                    await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            status: 'IN PROGRESS', 
+                            response_time: finalResponseText 
+                        })
+                    });
+                } catch (err) {
+                    console.error("Gagal update Supabase:", err);
+                    showToast("Error Database", "Gagal menyimpan waktu respons.", "error", "ph-warning-octagon");
+                }
+            }
+
+            // Eksekusi MS Teams Deep Link
+            setTimeout(() => {
+                window.location.href = `msteams://teams.microsoft.com/l/chat/0/0?users=${email}`;
+            }, 800);
+        }
+
+        // --- 8. DELETE SYSTEM (MODAL & SUPABASE) ---
+        function openDeleteModal(id) {
+            rowToDeleteId = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeModal() {
+            rowToDeleteId = null;
+            document.getElementById('deleteModal').classList.remove('active');
+        }
+
+        // Eksekusi saat tombol 'Ya, Hapus' di klik
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+            if (!rowToDeleteId) return;
+            
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="ph ph-spinner spinning"></i> Menghapus...`;
+            btn.disabled = true;
+
+            try {
+                // Eksekusi DELETE ke API Supabase
+                const response = await fetch(`${SUPABASE_URL}?id=eq.${rowToDeleteId}`, {
+                    method: 'DELETE',
+                    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+                });
+
+                if (!response.ok) throw new Error("Gagal menghapus");
+
+                // Update lokal state
+                allRequests = allRequests.filter(req => req.id !== rowToDeleteId);
+                applyFiltersAndRender();
+                
+                showToast("Data Dihapus", "Request telah dibersihkan secara permanen.", "success", "ph-trash");
+            } catch (err) {
+                console.error(err);
+                showToast("Gagal Menghapus", "Terjadi kesalahan sistem.", "error", "ph-warning");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                closeModal();
+            }
+        });
+
+        // Tutup modal jika area luar diklik
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // --- 9. ADVANCED TOAST NOTIFICATION ---
+        /**
+         * @param {string} title - Judul alert
+         * @param {string} message - Pesan detail
+         * @param {string} type - 'success', 'info', atau 'error'
+         * @param {string} icon - Phosphor icon class (e.g., 'ph-check-circle')
+         */
+        function showToast(title, message, type = "info", icon = "ph-info") {
+            const toastContainer = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            toast.innerHTML = `
+                <div class="toast-icon"><i class="ph ${icon}"></i></div>
+                <div class="toast-content">
+                    <h4>${title}</h4>
+                    <p>${message}</p>
+                </div>
+                <div class="toast-progress"></div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Hapus otomatis setelah animasi progress bar selesai (3.5 detik)
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                toast.addEventListener('animationend', (e) => {
+                    if(e.animationName === 'fadeOutRight') toast.remove();
+                });
+            }, 3500);
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            fetchSupabaseData(); // Tarik data pertama kali
+            addCursorHover(); // Inisialisasi cursor events
+        };
+    </script>
+</body>
+</html>
