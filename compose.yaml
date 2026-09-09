@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_PATH: /app/data/saku.db
+    volumes:
+      - saku-data:/app/data
+    restart: unless-stopped
+volumes:
+  saku-data:
