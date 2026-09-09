@@ -92,6 +92,14 @@ Dokumentasi resmi:
 - https://developers.google.com/identity/protocols/oauth2/web-server
 - https://developers.google.com/workspace/gmail/api/auth/scopes
 
+## Preview GitHub Pages
+
+Repository ini menyediakan workflow `.github/workflows/pages.yml` yang menerbitkan folder `public/` sebagai preview statis setiap kali ada push ke branch `main`.
+
+Aktifkan satu kali di GitHub: buka **Settings → Pages → Source: GitHub Actions**. Setelah workflow selesai, halaman login dapat dibuka dari alamat `https://HANIFRIZAM.github.io/smartfinance/`.
+
+GitHub Pages hanya menyediakan frontend statis. Login, registrasi, dashboard, SQLite, dan integrasi Google tetap harus dijalankan melalui backend Flask pada server/container. Untuk menjalankan aplikasi lengkap, gunakan alamat server Flask sesuai bagian deployment di bawah.
+
 ## Deployment server
 
 Gunakan server/container dengan Python dan disk persisten. Kode ini tidak bisa dijalankan seluruhnya di GitHub Pages/static hosting karena memiliki backend dan SQLite.
