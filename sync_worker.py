@@ -1,8 +1,7 @@
 """Run once from cron every five minutes; respects each user's opt-in."""
-from app import app, db, sync_gmail
+from app import app, sync_gmail, auto_sync_uids
 with app.app_context():
-    ids=[r[0] for r in db().execute('SELECT u.id FROM users u JOIN gmail g ON g.user_id=u.id WHERE u.auto_sync=1')]
-    for uid in ids:
+    for uid in auto_sync_uids():
         try:
             n=sync_gmail(uid)
             print(f'User {uid}: {n} new drafts')

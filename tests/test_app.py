@@ -4,6 +4,8 @@ TMP=tempfile.TemporaryDirectory()
 os.environ['DATABASE_PATH']=TMP.name+'/test.db'
 os.environ['SECRET_KEY']='test-secret-'+('x'*50)
 os.environ['BASE_URL']='http://localhost:8000'
+os.environ['SUPABASE_URL']=''
+os.environ['SUPABASE_PUBLISHABLE_KEY']=''
 from app import app, db, smart, today, cipher, sync_gmail
 
 class FinanceTests(unittest.TestCase):

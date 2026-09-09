@@ -15,11 +15,22 @@ SECRET = os.getenv('SECRET_KEY', '')
 if len(SECRET) < 32 or SECRET.startswith('replace-with-'): raise RuntimeError('Set SECRET_KEY minimal 32 karakter di .env')
 BASE = os.getenv('BASE_URL', 'http://localhost:8000').rstrip('/')
 DB = os.getenv('DATABASE_PATH', 'data/saku.db')
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').rstrip('/')
+SUPABASE_KEY = os.getenv('SUPABASE_PUBLISHABLE_KEY', '')
+REST = SUPABASE_URL + '/rest/v1/'
 os.makedirs(os.path.dirname(DB) or '.', exist_ok=True)
 app.config.update(SECRET_KEY=SECRET, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=BASE.startswith('https://'), PERMANENT_SESSION_LIFETIME=timedelta(days=7), MAX_CONTENT_LENGTH=32768)
 cipher = Fernet(base64.urlsafe_b64encode(hashlib.sha256((SECRET+'gmail-token').encode()).digest()))
 CATS = ['Makanan','Transportasi','Belanja','Tagihan','Kesehatan','Pendidikan','Hiburan','Gaji','Lainnya']
 RULES = {'Makanan':['makan','kopi','nasi','resto','gofood','grabfood','ayam','bakso','roti'], 'Transportasi':['bensin','parkir','tol','gojek','grabcar','kereta','transport','ojek'], 'Belanja':['baju','sepatu','laptop','barang','shopee','tokopedia','elektronik'], 'Tagihan':['listrik','internet','wifi','pulsa','sewa','pdam'], 'Kesehatan':['obat','dokter','rumah sakit','apotek'], 'Pendidikan':['buku','kuliah','kursus','sekolah'], 'Hiburan':['bioskop','netflix','spotify','game'], 'Gaji':['gaji','salary','honor','bonus']}
+
+def use_supabase():
+    return bool(SUPABASE_URL and SUPABASE_KEY)
+
+class SupabaseError(Exception):
+    def __init__(self, status):
+        self.status = status
+        super().__init__('supabase status ' + str(status))
 
 def db():
     if 'db' not in g:
@@ -29,15 +40,210 @@ def db():
 def close(_):
     if 'db' in g: g.db.close()
 with app.app_context():
-    db().executescript('''
-    PRAGMA journal_mode=WAL;
-    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,password TEXT,google_sub TEXT UNIQUE,budget INTEGER DEFAULT 0,threshold INTEGER DEFAULT 80,auto_sync INTEGER DEFAULT 0);
-    CREATE TABLE IF NOT EXISTS pockets(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),name TEXT NOT NULL,target INTEGER NOT NULL,balance INTEGER DEFAULT 0 CHECK(balance>=0));
-    CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),description TEXT NOT NULL,amount INTEGER NOT NULL CHECK(amount>0),kind TEXT NOT NULL,category TEXT NOT NULL,date TEXT NOT NULL,source TEXT DEFAULT 'manual');
-    CREATE TABLE IF NOT EXISTS gmail(user_id INTEGER PRIMARY KEY REFERENCES users(id),token TEXT NOT NULL,email TEXT,last_sync TEXT);
-    CREATE TABLE IF NOT EXISTS imports(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),message_id TEXT NOT NULL,description TEXT,amount INTEGER,kind TEXT,category TEXT,date TEXT,status TEXT DEFAULT 'pending',UNIQUE(user_id,message_id));
-    CREATE TABLE IF NOT EXISTS attempts(key TEXT PRIMARY KEY,count INTEGER,started REAL);
-    '''); db().commit()
+    if not use_supabase():
+        db().executescript('''
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,password TEXT,google_sub TEXT UNIQUE,budget INTEGER DEFAULT 0,threshold INTEGER DEFAULT 80,auto_sync INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS pockets(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),name TEXT NOT NULL,target INTEGER NOT NULL,balance INTEGER DEFAULT 0 CHECK(balance>=0));
+        CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),description TEXT NOT NULL,amount INTEGER NOT NULL CHECK(amount>0),kind TEXT NOT NULL,category TEXT NOT NULL,date TEXT NOT NULL,source TEXT DEFAULT 'manual');
+        CREATE TABLE IF NOT EXISTS gmail(user_id INTEGER PRIMARY KEY REFERENCES users(id),token TEXT NOT NULL,email TEXT,last_sync TEXT);
+        CREATE TABLE IF NOT EXISTS imports(id INTEGER PRIMARY KEY,user_id INTEGER REFERENCES users(id),message_id TEXT NOT NULL,description TEXT,amount INTEGER,kind TEXT,category TEXT,date TEXT,status TEXT DEFAULT 'pending',UNIQUE(user_id,message_id));
+        CREATE TABLE IF NOT EXISTS attempts(key TEXT PRIMARY KEY,count INTEGER,started REAL);
+        '''); db().commit()
+
+def sb_req(method, table, params=None, body=None, prefer='return=minimal'):
+    headers = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json'}
+    if method in ('POST', 'PATCH', 'DELETE'):
+        headers['Prefer'] = prefer
+    try:
+        r = requests.request(method, REST + table, headers=headers, params=params or [], json=body if method != 'GET' else None, timeout=25)
+        if r.status_code >= 300:
+            raise SupabaseError(r.status_code)
+        return r.json() if r.status_code != 204 else []
+    except requests.RequestException as exc:
+        raise SupabaseError(0) from exc
+
+def sbf(**kw):
+    out = []
+    for k, v in kw.items():
+        out.append((k, 'is.' + str(v).lower() if isinstance(v, bool) else 'eq.' + str(v)))
+    return out
+
+def get_user_by_email(email):
+    if use_supabase():
+        rows = sb_req('GET', 'users', params=sbf(email=email) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM users WHERE email=?', (email,)).fetchone()
+    return dict(row) if row else None
+
+def get_user_by_google_sub(sub):
+    if use_supabase():
+        rows = sb_req('GET', 'users', params=sbf(google_sub=sub) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM users WHERE google_sub=?', (sub,)).fetchone()
+    return dict(row) if row else None
+
+def get_user_by_id(uid):
+    if use_supabase():
+        rows = sb_req('GET', 'users', params=sbf(id=uid) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone()
+    return dict(row) if row else None
+
+def create_user(name, email, password=None, google_sub=None):
+    payload = {'name': name, 'email': email}
+    if password: payload['password'] = password
+    if google_sub: payload['google_sub'] = google_sub
+    if use_supabase():
+        rows = sb_req('POST', 'users', params=[('select', 'id')], body=payload, prefer='return=representation')
+        return rows[0]['id']
+    cur = db().execute('INSERT INTO users(name,email,password,google_sub) VALUES (?,?,?,?)', (name, email, password, google_sub)); db().commit()
+    return cur.lastrowid
+
+def update_settings(uid, budget, threshold, auto_sync):
+    if use_supabase():
+        sb_req('PATCH', 'users', params=sbf(id=uid), body={'budget': budget, 'threshold': threshold, 'auto_sync': auto_sync}); return
+    db().execute('UPDATE users SET budget=?,threshold=?,auto_sync=? WHERE id=?', (budget, threshold, int(auto_sync), uid)); db().commit()
+
+def update_auto_sync(uid, val):
+    if use_supabase():
+        sb_req('PATCH', 'users', params=sbf(id=uid), body={'auto_sync': bool(val)}); return
+    db().execute('UPDATE users SET auto_sync=? WHERE id=?', (int(bool(val)), uid)); db().commit()
+
+def attempt_lookup(key):
+    if use_supabase():
+        rows = sb_req('GET', 'attempts', params=sbf(key=key) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM attempts WHERE key=?', (key,)).fetchone()
+    return dict(row) if row else None
+
+def attempt_reset(key, now):
+    if use_supabase():
+        try: sb_req('POST', 'attempts', params=[('on_conflict', 'key')], body={'key': key, 'count': 1, 'started': now})
+        except SupabaseError: pass
+        return
+    db().execute('INSERT OR REPLACE INTO attempts VALUES (?,1,?)', (key, now)); db().commit()
+
+def attempt_bump(key):
+    if use_supabase():
+        try:
+            rows = sb_req('GET', 'attempts', params=sbf(key=key) + [('limit', '1')])
+            if rows:
+                sb_req('POST', 'attempts', params=[('on_conflict', 'key')], body={**rows[0], 'count': rows[0]['count'] + 1})
+        except SupabaseError: pass
+        return
+    db().execute('UPDATE attempts SET count=count+1 WHERE key=?', (key,)); db().commit()
+
+def attempt_prune(now):
+    if use_supabase():
+        try: sb_req('DELETE', 'attempts', params=[('started', 'lt.' + str(now - 86400))])
+        except SupabaseError: pass
+        return
+    db().execute('DELETE FROM attempts WHERE started<?', (now - 86400,)); db().commit()
+
+def list_transactions(uid):
+    if use_supabase():
+        return sb_req('GET', 'transactions', params=sbf(user_id=uid) + [('order', 'date.desc,id.desc')])
+    return [dict(r) for r in db().execute('SELECT * FROM transactions WHERE user_id=? ORDER BY date DESC,id DESC', (uid,))]
+
+def add_transaction(uid, description, amount, kind, category, date, source='manual'):
+    if use_supabase():
+        sb_req('POST', 'transactions', body={'user_id': uid, 'description': description, 'amount': amount, 'kind': kind, 'category': category, 'date': date, 'source': source}); return
+    db().execute('INSERT INTO transactions(user_id,description,amount,kind,category,date,source) VALUES (?,?,?,?,?,?,?)', (uid, description, amount, kind, category, date, source)); db().commit()
+
+def delete_transaction(uid, tid):
+    if use_supabase():
+        sb_req('DELETE', 'transactions', params=sbf(user_id=uid, id=tid)); return
+    db().execute('DELETE FROM transactions WHERE id=? AND user_id=?', (tid, uid)); db().commit()
+
+def list_pockets(uid):
+    if use_supabase():
+        return sb_req('GET', 'pockets', params=sbf(user_id=uid))
+    return [dict(r) for r in db().execute('SELECT * FROM pockets WHERE user_id=?', (uid,))]
+
+def get_pocket(uid, pid):
+    if use_supabase():
+        rows = sb_req('GET', 'pockets', params=sbf(user_id=uid, id=pid) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM pockets WHERE id=? AND user_id=?', (pid, uid)).fetchone()
+    return dict(row) if row else None
+
+def add_pocket(uid, name, target):
+    if use_supabase():
+        sb_req('POST', 'pockets', body={'user_id': uid, 'name': name, 'target': target}); return
+    db().execute('INSERT INTO pockets(user_id,name,target) VALUES (?,?,?)', (uid, name, target)); db().commit()
+
+def set_pocket_balance(uid, pid, balance):
+    if use_supabase():
+        sb_req('PATCH', 'pockets', params=sbf(user_id=uid, id=pid), body={'balance': balance}); return
+    db().execute('UPDATE pockets SET balance=? WHERE id=? AND user_id=?', (balance, pid, uid)); db().commit()
+
+def get_gmail(uid):
+    if use_supabase():
+        rows = sb_req('GET', 'gmail', params=sbf(user_id=uid) + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute('SELECT * FROM gmail WHERE user_id=?', (uid,)).fetchone()
+    return dict(row) if row else None
+
+def save_gmail(uid, token, email, last_sync=None):
+    if use_supabase():
+        sb_req('POST', 'gmail', params=[('on_conflict', 'user_id')], body={'user_id': uid, 'token': token, 'email': email, 'last_sync': last_sync}); return
+    db().execute('INSERT OR REPLACE INTO gmail(user_id,token,email,last_sync) VALUES (?,?,?,?)', (uid, token, email, last_sync)); db().commit()
+
+def delete_gmail(uid):
+    if use_supabase():
+        sb_req('DELETE', 'gmail', params=sbf(user_id=uid)); return
+    db().execute('DELETE FROM gmail WHERE user_id=?', (uid,)); db().commit()
+
+def set_gmail_last_sync(uid, ts):
+    if use_supabase():
+        sb_req('PATCH', 'gmail', params=sbf(user_id=uid), body={'last_sync': str(ts)}); return
+    db().execute('UPDATE gmail SET last_sync=? WHERE user_id=?', (str(ts), uid)); db().commit()
+
+def list_pending_imports(uid):
+    if use_supabase():
+        return sb_req('GET', 'imports', params=sbf(user_id=uid, status='pending') + [('order', 'id.desc')])
+    return [dict(r) for r in db().execute("SELECT * FROM imports WHERE user_id=? AND status='pending' ORDER BY id DESC", (uid,))]
+
+def get_pending_import(uid, iid):
+    if use_supabase():
+        rows = sb_req('GET', 'imports', params=sbf(user_id=uid, id=iid, status='pending') + [('limit', '1')])
+        return rows[0] if rows else None
+    row = db().execute("SELECT * FROM imports WHERE id=? AND user_id=? AND status='pending'", (iid, uid)).fetchone()
+    return dict(row) if row else None
+
+def import_exists(uid, message_id):
+    if use_supabase():
+        rows = sb_req('GET', 'imports', params=sbf(user_id=uid, message_id=message_id) + [('select', 'id'), ('limit', '1')])
+        return bool(rows)
+    return db().execute('SELECT id FROM imports WHERE user_id=? AND message_id=?', (uid, message_id)).fetchone() is not None
+
+def insert_import(uid, message_id, description, amount, kind, category, date):
+    if use_supabase():
+        if import_exists(uid, message_id): return 0
+        try:
+            sb_req('POST', 'imports', body={'user_id': uid, 'message_id': message_id, 'description': description, 'amount': amount, 'kind': kind, 'category': category, 'date': date})
+            return 1
+        except SupabaseError: return 0
+    cur = db().execute('INSERT OR IGNORE INTO imports(user_id,message_id,description,amount,kind,category,date) VALUES (?,?,?,?,?,?,?)', (uid, message_id, description, amount, kind, category, date)); db().commit()
+    return cur.rowcount
+
+def set_import_status(uid, iid, status):
+    if use_supabase():
+        sb_req('PATCH', 'imports', params=sbf(user_id=uid, id=iid), body={'status': status}); return
+    db().execute('UPDATE imports SET status=? WHERE id=? AND user_id=?', (status, iid, uid)); db().commit()
+
+def auto_sync_uids():
+    if use_supabase():
+        return [r['id'] for r in sb_req('GET', 'users', params=sbf(auto_sync=True) + [('select', 'id')])]
+    return [r[0] for r in db().execute('SELECT u.id FROM users u JOIN gmail g ON g.user_id=u.id WHERE u.auto_sync=1')]
+
+def totals(uid):
+    rows = list_transactions(uid)
+    income = sum(r['amount'] for r in rows if r['kind'] == 'income')
+    expense = sum(r['amount'] for r in rows if r['kind'] == 'expense')
+    reserved = sum(p['balance'] for p in list_pockets(uid))
+    return income - expense, reserved
 
 def fail(message, status=400): return jsonify(error=message),status
 def auth(fn):
@@ -61,6 +267,8 @@ def headers(resp):
 def server_error(_): return fail('Terjadi masalah server. Coba lagi.',500)
 @app.errorhandler(ValueError)
 def validation(e): return fail(str(e))
+@app.errorhandler(SupabaseError)
+def db_error(_): return fail('Database tidak dapat diakses.',503)
 
 def data(): return request.get_json(silent=True) or {}
 def textfield(d,k,n=160):
@@ -81,12 +289,6 @@ def parsed(d):
     if date>today(): raise ValueError('Transaksi masa depan belum didukung.')
     return desc,a,kind,cat,date
 
-def totals(uid):
-    rows=db().execute('SELECT kind,SUM(amount) n FROM transactions WHERE user_id=? GROUP BY kind',(uid,)).fetchall()
-    values={r['kind']:r['n'] for r in rows}; balance=values.get('income',0)-values.get('expense',0)
-    reserved=db().execute('SELECT COALESCE(SUM(balance),0) FROM pockets WHERE user_id=?',(uid,)).fetchone()[0]
-    return balance,reserved
-
 def login_user(uid):
     session.clear();session['uid']=uid;session['csrf']=secrets.token_urlsafe(32);session.permanent=True
 @app.get('/')
@@ -106,19 +308,21 @@ def credentials(mode):
     d=data();email=textfield(d,'email',254).lower();password=textfield(d,'password',128)
     if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email): return fail('Email tidak valid.')
     key=hashlib.sha256((str(request.remote_addr)+email).encode()).hexdigest(); now=time.time()
-    c=db(); c.execute('BEGIN IMMEDIATE'); r=c.execute('SELECT * FROM attempts WHERE key=?',(key,)).fetchone()
-    if r and now-r['started']<900 and r['count']>=15: c.rollback();return fail('Terlalu banyak percobaan. Tunggu 15 menit.',429)
-    if not r or now-r['started']>=900: c.execute('INSERT OR REPLACE INTO attempts VALUES (?,1,?)',(key,now))
-    else: c.execute('UPDATE attempts SET count=count+1 WHERE key=?',(key,))
-    c.execute('DELETE FROM attempts WHERE started<?',(now-86400,));c.commit()
-    u=c.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
+    r=attempt_lookup(key)
+    if r and now-r['started']<900 and r['count']>=15: return fail('Terlalu banyak percobaan. Tunggu 15 menit.',429)
+    if not r or now-r['started']>=900: attempt_reset(key,now)
+    else: attempt_bump(key)
+    attempt_prune(now)
+    u=get_user_by_email(email)
     if mode=='signup':
         if len(password)<10: return fail('Password minimal 10 karakter.')
         if u: return fail('Email sudah digunakan. Silakan masuk.')
         name=textfield(d,'name',80)
         try:
-            cur=c.execute('INSERT INTO users(name,email,password) VALUES (?,?,?)',(name,email,generate_password_hash(password))); c.commit(); uid=cur.lastrowid
-        except sqlite3.IntegrityError: return fail('Email sudah digunakan.')
+            uid=create_user(name,email,generate_password_hash(password))
+        except (sqlite3.IntegrityError, SupabaseError) as e:
+            if isinstance(e, SupabaseError) and e.status != 409: raise
+            return fail('Email sudah digunakan.')
     else:
         if not u or not u['password'] or not check_password_hash(u['password'],password): return fail('Email atau password salah.',401)
         uid=u['id']
@@ -128,41 +332,41 @@ def logout(): session.clear();return jsonify(ok=True)
 @app.get('/api/dashboard')
 @auth
 def overview():
-    uid=session['uid'];u=dict(db().execute('SELECT id,name,email,budget,threshold,auto_sync FROM users WHERE id=?',(uid,)).fetchone())
-    balance,reserved=totals(uid)
-    tx=[dict(r) for r in db().execute('SELECT * FROM transactions WHERE user_id=? ORDER BY date DESC,id DESC',(uid,))]
-    month=today()[:7]; income=sum(t['amount'] for t in tx if t['kind']=='income' and t['date'].startswith(month));expense=sum(t['amount'] for t in tx if t['kind']=='expense' and t['date'].startswith(month))
-    gm=db().execute('SELECT email,last_sync FROM gmail WHERE user_id=?',(uid,)).fetchone()
-    return jsonify(user=u,balance=balance,reserved=reserved,available=balance-reserved,income=income,expense=expense,transactions=tx,pockets=[dict(r) for r in db().execute('SELECT * FROM pockets WHERE user_id=?',(uid,))],gmail=dict(gm) if gm else None,imports=[dict(r) for r in db().execute("SELECT * FROM imports WHERE user_id=? AND status='pending' ORDER BY id DESC",(uid,))],month=month)
+    uid=session['uid'];u={k:get_user_by_id(uid)[k] for k in ('id','name','email','budget','threshold','auto_sync')}
+    tx=list_transactions(uid)
+    income=sum(t['amount'] for t in tx if t['kind']=='income');expense=sum(t['amount'] for t in tx if t['kind']=='expense');balance=income-expense
+    pockets=list_pockets(uid);reserved=sum(p['balance'] for p in pockets)
+    month=today()[:7]; minc=sum(t['amount'] for t in tx if t['kind']=='income' and t['date'].startswith(month)); mexp=sum(t['amount'] for t in tx if t['kind']=='expense' and t['date'].startswith(month))
+    return jsonify(user=u,balance=balance,reserved=reserved,available=balance-reserved,income=minc,expense=mexp,transactions=tx,pockets=pockets,gmail=get_gmail(uid),imports=list_pending_imports(uid),month=month)
 @app.post('/api/transactions')
 @auth
 def add_tx():
-    vals=parsed(data());db().execute('INSERT INTO transactions(user_id,description,amount,kind,category,date) VALUES (?,?,?,?,?,?)',(session['uid'],*vals));db().commit();return jsonify(ok=True)
+    vals=parsed(data());add_transaction(session['uid'],*vals);return jsonify(ok=True)
 @app.delete('/api/transactions/<int:id>')
 @auth
 def delete_tx(id):
-    db().execute('DELETE FROM transactions WHERE id=? AND user_id=?',(id,session['uid']));db().commit();return jsonify(ok=True)
+    delete_transaction(session['uid'],id);return jsonify(ok=True)
 @app.post('/api/pockets')
 @auth
 def pocket():
-    d=data();db().execute('INSERT INTO pockets(user_id,name,target) VALUES (?,?,?)',(session['uid'],textfield(d,'name',60),amount(d.get('target'))));db().commit();return jsonify(ok=True)
+    d=data();add_pocket(session['uid'],textfield(d,'name',60),amount(d.get('target')));return jsonify(ok=True)
 @app.post('/api/pockets/<int:id>/allocate')
 @auth
 def allocate(id):
-    d=data();a=amount(d.get('amount'));direction=d.get('direction');uid=session['uid'];c=db();c.execute('BEGIN IMMEDIATE')
-    p=c.execute('SELECT * FROM pockets WHERE id=? AND user_id=?',(id,uid)).fetchone()
-    if not p: c.rollback();return fail('Pocket tidak ditemukan.',404)
+    d=data();a=amount(d.get('amount'));direction=d.get('direction');uid=session['uid']
+    p=get_pocket(uid,id)
+    if not p: return fail('Pocket tidak ditemukan.',404)
     balance,reserved=totals(uid)
     if direction=='in' and a<=balance-reserved: delta=a
     elif direction=='out' and a<=p['balance']: delta=-a
-    else: c.rollback();return fail('Saldo tidak cukup atau arah tidak valid.')
-    c.execute('UPDATE pockets SET balance=balance+? WHERE id=? AND user_id=?',(delta,id,uid));c.commit();return jsonify(ok=True)
+    else: return fail('Saldo tidak cukup atau arah tidak valid.')
+    set_pocket_balance(uid,id,p['balance']+delta);return jsonify(ok=True)
 @app.post('/api/settings')
 @auth
 def settings():
     d=data();b=amount(d.get('budget'),True);t=amount(d.get('threshold'))
     if t>100: return fail('Ambang harus 1–100%.')
-    db().execute('UPDATE users SET budget=?,threshold=?,auto_sync=? WHERE id=?',(b,t,int(d.get('auto_sync') is True),session['uid']));db().commit();return jsonify(ok=True)
+    update_settings(session['uid'],b,t,int(d.get('auto_sync') is True));return jsonify(ok=True)
 
 def smart(s):
     low=s.lower();cat=next((c for c,words in RULES.items() if any(re.search(r'\b'+re.escape(w)+r'\b',low) for w in words)),'Lainnya')
@@ -210,20 +414,20 @@ def google_callback():
         if info.get('email_verified') is not True: raise ValueError('Unverified Google email')
         if flow['mode']=='gmail':
             if not session.get('uid') or flow['uid']!=session['uid'] or GMAIL_SCOPE not in tok.get('scope','').split(): raise ValueError('Missing Gmail consent')
-            uid=session['uid'];old=db().execute('SELECT * FROM gmail WHERE user_id=?',(uid,)).fetchone()
+            uid=session['uid'];old=get_gmail(uid)
             if 'refresh_token' not in tok and old and old['email']==info['email']: tok['refresh_token']=json.loads(cipher.decrypt(old['token'].encode()))['refresh_token']
             if not tok.get('refresh_token'): raise ValueError('Missing refresh token')
-            db().execute('INSERT OR REPLACE INTO gmail(user_id,token,email,last_sync) VALUES (?,?,?,NULL)',(uid,cipher.encrypt(json.dumps(tok).encode()).decode(),info['email']));db().commit()
+            save_gmail(uid,cipher.encrypt(json.dumps(tok).encode()).decode(),info['email'])
         else:
-            u=db().execute('SELECT * FROM users WHERE google_sub=?',(info['sub'],)).fetchone()
+            u=get_user_by_google_sub(info['sub'])
             if not u:
                 # Never link a pre-registered, unverified email automatically.
-                if db().execute('SELECT id FROM users WHERE email=?',(info['email'].lower(),)).fetchone(): return redirect('/?error=email_exists')
-                cur=db().execute('INSERT INTO users(name,email,google_sub) VALUES (?,?,?)',(info.get('name',info['email']),info['email'].lower(),info['sub']));db().commit();uid=cur.lastrowid
+                if get_user_by_email(info['email'].lower()): return redirect('/?error=email_exists')
+                uid=create_user(info.get('name',info['email']),info['email'].lower(),None,info['sub'])
             else: uid=u['id']
             login_user(uid)
         return redirect('/dashboard.html?connected=1')
-    except (requests.RequestException,ValueError,KeyError,sqlite3.IntegrityError): return redirect(dest+'?error=google_failed')
+    except (requests.RequestException,ValueError,KeyError,sqlite3.IntegrityError,SupabaseError): return redirect(dest+'?error=google_failed')
 
 def body_text(payload):
     parts=[]
@@ -233,7 +437,7 @@ def body_text(payload):
     return parts
 
 def sync_gmail(uid):
-    c=db();row=c.execute('SELECT * FROM gmail WHERE user_id=?',(uid,)).fetchone()
+    row=get_gmail(uid)
     if not row: raise ValueError('Hubungkan Gmail terlebih dahulu.')
     if row['last_sync'] and time.time()-float(row['last_sync'])<60: return 0
     tok=json.loads(cipher.decrypt(row['token'].encode())); fresh=google_post('https://oauth2.googleapis.com/token',dict(client_id=os.getenv('GOOGLE_CLIENT_ID'),client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),refresh_token=tok['refresh_token'],grant_type='refresh_token'))
@@ -244,7 +448,7 @@ def sync_gmail(uid):
         if page:params['pageToken']=page
         result=google_get('https://gmail.googleapis.com/gmail/v1/users/me/messages',token,params)
         for item in result.get('messages',[]):
-            if c.execute('SELECT id FROM imports WHERE user_id=? AND message_id=?',(uid,item['id'])).fetchone(): continue
+            if import_exists(uid,item['id']): continue
             msg=google_get('https://gmail.googleapis.com/gmail/v1/users/me/messages/'+item['id'],token,{'format':'full'})
             headers={h['name'].lower():h['value'] for h in msg.get('payload',{}).get('headers',[])}
             subject=headers.get('subject','Email transaksi');body=' '.join(body_text(msg.get('payload',{}))) or msg.get('snippet','')
@@ -255,11 +459,10 @@ def sync_gmail(uid):
             n=vals[0] if len(set(vals))==1 and vals else 0
             s=smart(subject+' '+body[:1000]);kind='income' if re.search(r'transfer diterima|dana masuk|refund berhasil',subject+' '+body,re.I) else 'expense'
             day=datetime.fromtimestamp(int(msg['internalDate'])/1000,ZoneInfo('Asia/Jakarta')).date().isoformat()
-            cur=c.execute('INSERT OR IGNORE INTO imports(user_id,message_id,description,amount,kind,category,date) VALUES (?,?,?,?,?,?,?)',(uid,item['id'],subject[:160],n,kind,s['category'],day));count+=cur.rowcount
-            c.commit()
+            count+=insert_import(uid,item['id'],subject[:160],n,kind,s['category'],day)
         page=result.get('nextPageToken')
         if not page: break
-    c.execute('UPDATE gmail SET last_sync=? WHERE user_id=?',(str(time.time()),uid));c.commit();return count
+    set_gmail_last_sync(uid,str(time.time()));return count
 @app.post('/api/gmail/sync')
 @auth
 def sync_api():
@@ -268,20 +471,19 @@ def sync_api():
 @app.delete('/api/gmail')
 @auth
 def disconnect():
-    uid=session['uid'];row=db().execute('SELECT token FROM gmail WHERE user_id=?',(uid,)).fetchone()
+    uid=session['uid'];row=get_gmail(uid)
     if row:
         tok=json.loads(cipher.decrypt(row['token'].encode()))
         try: requests.post('https://oauth2.googleapis.com/revoke',data={'token':tok['refresh_token']},timeout=15)
         except requests.RequestException: pass
-    db().execute('DELETE FROM gmail WHERE user_id=?',(uid,));db().execute('UPDATE users SET auto_sync=0 WHERE id=?',(uid,));db().commit();return jsonify(ok=True)
+    delete_gmail(uid);update_auto_sync(uid,0);return jsonify(ok=True)
 @app.post('/api/imports/<int:id>/<action>')
 @auth
 def accept_import(id,action):
     if action not in ['accept','ignore']:return fail('Aksi tidak valid.')
     vals=parsed(data()) if action=='accept' else None
-    c=db();c.execute('BEGIN IMMEDIATE');row=c.execute("SELECT * FROM imports WHERE id=? AND user_id=? AND status='pending'",(id,session['uid'])).fetchone()
-    if not row:c.rollback();return fail('Draft sudah diproses atau tidak ditemukan.',409)
-    if vals:c.execute("INSERT INTO transactions(user_id,description,amount,kind,category,date,source) VALUES (?,?,?,?,?,?,'gmail')",(session['uid'],*vals))
-    c.execute('UPDATE imports SET status=? WHERE id=?',(action,id));c.commit();return jsonify(ok=True)
+    if not get_pending_import(session['uid'],id):return fail('Draft sudah diproses atau tidak ditemukan.',409)
+    if vals:add_transaction(session['uid'],*vals,source='gmail')
+    set_import_status(session['uid'],id,action);return jsonify(ok=True)
 
 if __name__=='__main__':app.run(host='0.0.0.0',port=8000)

@@ -35,6 +35,21 @@ docker compose up --build -d
 
 Database disimpan pada volume `saku-data`. Jangan menjalankan `docker compose down -v` bila ingin mempertahankan data. Nilai SECRET_KEY harus tetap sama setelah restart; perubahan akan mengakhiri sesi dan membuat token Gmail lama tidak dapat dibaca sehingga perlu koneksi ulang.
 
+## Penyimpanan Supabase (opsional, disarankan untuk hosting)
+
+Aplikasi bisa memakai Supabase (PostgreSQL) sebagai pengganti SQLite. Karena aplikasi memakai sesi login sendiri (bukan Supabase Auth) dan selalu memfilter data per `user_id`, skema dimuat dengan Row Level Security nonaktif dan `SUPABASE_PUBLISHABLE_KEY` digunakan hanya di sisi server.
+
+1. Di dashboard Supabase, buka **SQL Editor → New query**, tempel isi `supabase/schema.sql`, lalu jalankan sekali.
+2. Salin `Supabase URL` dan key `publishable` (Settings → API / Project settings) dari dashboard Supabase.
+3. Isi `.env`:
+   ```dotenv
+   SUPABASE_URL=https://stgbzqvxvsmjrjnyfrla.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
+4. Restart aplikasi. Jika `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY` terisi, semua data disimpan di Supabase; jika dibiarkan kosong, aplikasi kembali memakai SQLite `DATABASE_PATH`.
+
+Keamanan: jangan pernah membocorkan publishable key ke frontend publik. Saat menggunakan Supabase, cadangan tidak lagi di SQLite lokal; backup dilakukan dari Supabase (misalnya `supabase db dump` atau snapshot proyek). Tabel lama berprefix `saku_*` (jika ada) dari proyek yang sama tidak dipakai oleh skema baru dan bisa dihapus bila tidak dibutuhkan.
+
 ## Menjalankan tanpa Docker
 
 Python 3.12 disarankan.
@@ -150,6 +165,7 @@ saku-finance/
     dashboard.js        Interaksi dashboard/API
   app.py                API, database, auth, parser, OAuth Gmail
   sync_worker.py        Sinkronisasi terjadwal
+  supabase/schema.sql   Skema dan hak akses Supabase (jalankan sekali di SQL Editor)
   tests/test_app.py     Pengujian backend
   requirements.txt
   Dockerfile
